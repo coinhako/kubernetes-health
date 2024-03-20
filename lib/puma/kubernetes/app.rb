@@ -62,8 +62,8 @@ module Puma
         # On puma <= 4 puma_stats is a String
         puma_stats = JSON.parse(puma_stats, symbolize_names: true) if puma_stats.is_a?(String)
         # Including usage stats.
-        puma_stats = merge_worker_status(puma_stats) unless puma_stats[:worker_status]&.empty?
-        puma_stats[:usage] = (1 - puma_stats[:pool_capacity].to_f / puma_stats[:max_threads]).round(2) unless puma_stats[:pool_capacity]&.empty?
+        puma_stats = merge_worker_status(puma_stats) if present?(puma_stats[:worker_status])
+        puma_stats[:usage] = (1 - puma_stats[:pool_capacity].to_f / puma_stats[:max_threads]).round(2) if present?(puma_stats[:pool_capacity])
         puma_stats
       end
 
@@ -91,11 +91,21 @@ module Puma
       def puma_already_started?(extended_puma_stats)
         return false if extended_puma_stats.empty?
 
-        # Single Mode
-        return extended_puma_stats[:running].positive? unless extended_puma_stats[:running]&.empty?
+        if present?(extended_puma_stats[:booted_workers])
+          # Cluster Mode
+          extended_puma_stats[:booted_workers].positive?
+        else
+          # Single Mode
+          extended_puma_stats[:running].positive?
+        end
+      end
 
-        # Cluster Mode
-        extended_puma_stats[:booted_workers].positive?
+      def blank?(object)
+        object.respond_to?(:empty?) ? !!object.empty? : !object
+      end
+
+      def present?(object)
+        !blank?(object)
       end
     end
   end
